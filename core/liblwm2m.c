@@ -377,7 +377,7 @@ int lwm2m_remove_object(lwm2m_context_t * contextP,
 
 
 int lwm2m_step(lwm2m_context_t * contextP,
-               time_t * timeoutP)
+               uint32_t * timeoutP)
 {
     time_t tv_sec;
 

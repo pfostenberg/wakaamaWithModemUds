@@ -29,6 +29,22 @@
 
 #include "liblwm2m.h"
 
+
+
+typedef struct MY_TYPE_ {
+    const char *server;
+    const char *serverPort;
+    const char *name;
+    const char *p_pskId;
+    char *psk;
+    uint16_t pskLen;
+    lwm2m_context_t *lwm2mH;
+    //struct timeval tv;
+    uint32_t myTv;
+} MY_TYPE;
+
+int myClientInit(void);
+
 extern int g_reboot;
 
 /*
@@ -54,6 +70,10 @@ void display_location_object(lwm2m_object_t * objectP);
  * object_test.c
  */
 #define TEST_OBJECT_ID 31024
+
+// Temperaur
+//#define TEST_OBJECT_ID 3303
+
 lwm2m_object_t * get_test_object(void);
 void free_test_object(lwm2m_object_t * object);
 void display_test_object(lwm2m_object_t * objectP);

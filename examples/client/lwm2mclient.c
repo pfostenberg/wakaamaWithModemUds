@@ -88,6 +88,8 @@
 int g_reboot = 0;
 static int g_quit = 0;
 
+static bool nowPoll = false;
+
 #define OBJ_COUNT 9
 lwm2m_object_t * objArray[OBJ_COUNT];
 
@@ -907,39 +909,98 @@ static void prv_display_objects(lwm2m_context_t *lwm2mH, char *buffer, void *use
 
 void print_usage(void)
 {
-    fprintf(stdout, "Usage: lwm2mclient [OPTION]\r\n");
-    fprintf(stdout, "Launch a LWM2M client.\r\n");
-    fprintf(stdout, "Options:\r\n");
-    fprintf(stdout, "  -n NAME\tSet the endpoint name of the Client. Default: testlwm2mclient\r\n");
-    fprintf(stdout, "  -l PORT\tSet the local UDP port of the Client. Default: 56830\r\n");
-    fprintf(stdout, "  -h HOST\tSet the hostname of the LWM2M Server to connect to. Default: localhost\r\n");
-    fprintf(stdout, "  -p PORT\tSet the port of the LWM2M Server to connect to. Default: "LWM2M_STANDARD_PORT_STR"\r\n");
-    fprintf(stdout, "  -4\t\tUse IPv4 connection. Default: IPv6 connection\r\n");
-    fprintf(stdout, "  -t TIME\tSet the lifetime of the Client. Default: 300\r\n");
-    fprintf(stdout, "  -b\t\tBootstrap requested.\r\n");
-    fprintf(stdout, "  -c\t\tChange battery level over time.\r\n");
-    fprintf(stdout, "  -S BYTES\tCoAP block size. Options: 16, 32, 64, 128, 256, 512, 1024. Default: %" PRIu16 "\r\n",
-            (uint16_t)LWM2M_COAP_DEFAULT_BLOCK_SIZE);
-#ifdef WITH_TINYDTLS
-    fprintf(stdout, "  -i STRING\tSet the device management or bootstrap server PSK identity. If not set use none secure mode\r\n");
-    fprintf(stdout, "  -s HEXSTRING\tSet the device management or bootstrap server Pre-Shared-Key. If not set use none secure mode\r\n");
-#endif
-    fprintf(stdout, "\r\n");
 }
 
-int main(int argc, char *argv[])
+
+MY_TYPE g_LwM2M;
+
+int xxxx(lwm2m_context_t * lwm2mH)
 {
-    client_data_t data;
+
+
+/*
+         * This function does two things:
+         *  - first it does the work needed by liblwm2m (eg. (re)sending some packets).
+         *  - Secondly it adjusts the timeout value (default 60s) depending on the state of the transaction
+         *    (eg. retransmission) and the time between the next operation
+         */
+int result = lwm2m_step(lwm2mH, &(g_LwM2M.myTv));
+fprintf(stderr, " -> State: ");
+switch (lwm2mH->state)
+{
+case STATE_INITIAL:
+    fprintf(stderr, "STATE_INITIAL\r\n");
+    break;
+case STATE_BOOTSTRAP_REQUIRED:
+    fprintf(stderr, "STATE_BOOTSTRAP_REQUIRED\r\n");
+    break;
+case STATE_BOOTSTRAPPING:
+    fprintf(stderr, "STATE_BOOTSTRAPPING\r\n");
+    break;
+case STATE_REGISTER_REQUIRED:
+    fprintf(stderr, "STATE_REGISTER_REQUIRED\r\n");
+    break;
+case STATE_REGISTERING:
+    fprintf(stderr, "STATE_REGISTERING\r\n");
+    break;
+case STATE_READY:
+    fprintf(stderr, "STATE_READY\r\n");
+    break;
+default:
+    fprintf(stderr, "Unknown...\r\n");
+    break;
+}
+if (result != 0)
+{
+    fprintf(stderr, "lwm2m_step() failed: 0x%X\r\n", result);
+#ifdef LWM2M_BOOTSTRAP
+    if(previousState == STATE_BOOTSTRAPPING)
+    {
+#ifdef LWM2M_WITH_LOGS
+        fprintf(stdout, "[BOOTSTRAP] restore security and server objects\r\n");
+#endif
+        prv_restore_objects(lwm2mH);
+        lwm2mH->state = STATE_INITIAL;
+    } else
+#endif
+        return -1;
+}
+#ifdef LWM2M_BOOTSTRAP
+update_bootstrap_info(&previousState, lwm2mH);
+#endif
+}
+
+client_data_t data;
+
+
+int myClientInit(void)
+{
+// tcpdump -n udp port 7685
+    g_LwM2M.lwm2mH = NULL;
+    g_LwM2M.server = "lwm2m.mudip.com";
+    g_LwM2M.serverPort = "7685"; // LWM2M_DTLS_PORT_STR;  //LWM2M_STANDARD_PORT_STR;  // 5684
+
+    g_LwM2M.myTv =  60;  // What initial
+    // const char *name = "XyXX001";  // "TEST001"; secure
+    #ifdef MU_DTLS
+    g_LwM2M.name = "urn:imei:866901063238648";  // "TEST001";   see NO_FAKE_UDS
+    #else
+    g_LwM2M.name = "EID02";
+    #endif
+
+// test mit command line
+//    ./lwm2mclient_tinydtls -4 -h lwm2m.mudip.com -p 7685 -n urn:imei:866901063238648 -i urn:imei:866901063238648 -s 000102030405060708090a0b0c0d0e49
+
+}
+
+int main_wakaama(int argc, char *argv[])
+{
     int result;
-    lwm2m_context_t * lwm2mH = NULL;
-    const char * localPort = "56830";
-    const char * server = NULL;
-    const char * serverPort = LWM2M_STANDARD_PORT_STR;
-    const char *name = "testlwm2mclient";
+
     int lifetime = 300;
     int batterylevelchanging = 0;
     time_t reboot_time = 0;
-    int opt;
+
     bool bootstrapRequested = false;
     bool serverPortChanged = false;
 
@@ -947,237 +1008,66 @@ int main(int argc, char *argv[])
     lwm2m_client_state_t previousState = STATE_INITIAL;
 #endif
 
-    char * pskId = NULL;
-#ifdef WITH_TINYDTLS
-    char * psk = NULL;
-#endif
-    uint16_t pskLen = -1;
-    char * pskBuffer = NULL;
+#ifdef MU_DTLS
+    g_LwM2M.p_pskId = "urn:imei:866901063238648";
+    char *psk = "000102030405060708090a0b0c0d0e49";  // NO_FAKE_UDS
+    g_LwM2M.pskLen = strlen(psk)/2;   // Must be hex len / by two!
 
-    /*
-     * The function start by setting up the command line interface (which may or not be useful depending on your project)
-     *
-     * This is an array of commands describes as { name, description, long description, callback, userdata }.
-     * The firsts tree are easy to understand, the callback is the function that will be called when this command is typed
-     * and in the last one will be stored the lwm2m context (allowing access to the server settings and the objects).
-     */
-    command_desc_t commands[] = {
-        {"list", "List known servers.", NULL, prv_output_servers, NULL},
-        {"change", "Change the value of resource.",
-         " change URI [DATA]\r\n"
-         "   URI: uri of the resource such as /3/0, /3/0/2\r\n"
-         "   DATA: (optional) new value\r\n",
-         prv_change, NULL},
-        {"update", "Trigger a registration update",
-         " update SERVER\r\n"
-         "   SERVER: short server id such as 123\r\n",
-         prv_update, NULL},
-#ifndef LWM2M_VERSION_1_0
-        {"send", "Send one or more resources",
-         " send SERVER URI [URI...]\r\n"
-         "   SERVER: short server id such as 123. 0 for all.\r\n"
-         "   URI: uri of the resource such as /3/0, /3/0/2\r\n",
-         prv_send, NULL},
-#endif
-#ifdef LWM2M_BOOTSTRAP
-        {"bootstrap", "Initiate a DI bootstrap process", NULL, prv_initiate_bootstrap, NULL},
-        {"dispb",
-         "Display current backup of objects/instances/resources\r\n"
-         "\t(only security and server objects are backupped)",
-         NULL, prv_display_backup, NULL},
-#endif
-        {"ls", "List Objects and Instances", NULL, prv_object_list, NULL},
-        {"disp", "Display current objects/instances/resources", NULL, prv_display_objects, NULL},
-        {"dump", "Dump an Object",
-         "dump URI"
-         "URI: uri of the Object or Instance such as /3/0, /1\r\n",
-         prv_object_dump, NULL},
-        {"add", "Add support of object 31024", NULL, prv_add, NULL},
-        {"rm", "Remove support of object 31024", NULL, prv_remove, NULL},
-        {"quit", "Quit the client gracefully.", NULL, prv_quit, NULL},
-        {"^C", "Quit the client abruptly (without sending a de-register message).", NULL, NULL, NULL},
+  //  g_LwM2M.psk
+    g_LwM2M.psk = malloc(g_LwM2M.pskLen);
 
-        COMMAND_END_LIST};
-
-    memset(&data, 0, sizeof(client_data_t));
-    data.addressFamily = AF_INET6;
-
-    opt = 1;
-    while (opt < argc)
+    if (NULL == g_LwM2M.psk)
     {
-        if (argv[opt] == NULL
-            || argv[opt][0] != '-'
-            || argv[opt][2] != 0)
-        {
-            print_usage();
-            return 0;
-        }
-        switch (argv[opt][1])
-        {
-        case 'b':
-            bootstrapRequested = true;
-            if (!serverPortChanged) serverPort = LWM2M_BSSERVER_PORT_STR;
-            break;
-        case 'c':
-            batterylevelchanging = 1;
-            break;
-        case 't':
-            opt++;
-            if (opt >= argc)
-            {
-                print_usage();
-                return 0;
-            }
-            if (1 != sscanf(argv[opt], "%d", &lifetime))
-            {
-                print_usage();
-                return 0;
-            }
-            break;
-#ifdef WITH_TINYDTLS
-        case 'i':
-            opt++;
-            if (opt >= argc)
-            {
-                print_usage();
-                return 0;
-            }
-            pskId = argv[opt];
-            break;
-        case 's':
-            opt++;
-            if (opt >= argc)
-            {
-                print_usage();
-                return 0;
-            }
-            psk = argv[opt];
-            break;
-#endif
-        case 'n':
-            opt++;
-            if (opt >= argc)
-            {
-                print_usage();
-                return 0;
-            }
-            name = argv[opt];
-            break;
-        case 'l':
-            opt++;
-            if (opt >= argc)
-            {
-                print_usage();
-                return 0;
-            }
-            localPort = argv[opt];
-            break;
-        case 'h':
-            opt++;
-            if (opt >= argc)
-            {
-                print_usage();
-                return 0;
-            }
-            server = argv[opt];
-            break;
-        case 'p':
-            opt++;
-            if (opt >= argc)
-            {
-                print_usage();
-                return 0;
-            }
-            serverPort = argv[opt];
-            serverPortChanged = true;
-            break;
-        case '4':
-            data.addressFamily = AF_INET;
-            break;
-        case 'S':
-            opt++;
-            if (opt >= argc) {
-                print_usage();
-                return 0;
-            }
-            uint16_t coap_block_size_arg;
-            if (1 == sscanf(argv[opt], "%" SCNu16, &coap_block_size_arg) &&
-                lwm2m_set_coap_block_size(coap_block_size_arg)) {
-                break;
-            } else {
-                print_usage();
-                return 0;
-            }
-        default:
-            print_usage();
-            return 0;
-        }
-        opt += 1;
+    fprintf(stderr, "Failed to create PSK binary buffer\r\n");
+    return -1;
     }
+    // Hex string to binary
+    char *h = psk;
+    char *b = g_LwM2M.psk;
+    char xlate[] = "0123456789ABCDEF";
 
-    if (!server)
+    for ( ; *h; h += 2, ++b)
     {
-        server = (AF_INET == data.addressFamily ? DEFAULT_SERVER_IPV4 : DEFAULT_SERVER_IPV6);
-    }
+    char *l = strchr(xlate, toupper(*h));
+    char *r = strchr(xlate, toupper(*(h+1)));
 
-    /*
-     *This call an internal function that create an IPV6 socket on the port 5683.
-     */
-    fprintf(stderr, "Trying to bind LWM2M Client to port %s\r\n", localPort);
-    data.sock = create_socket(localPort, data.addressFamily);
-    if (data.sock < 0)
+    if (!r || !l)
     {
-        fprintf(stderr, "Failed to open socket: %d %s\r\n", errno, strerror(errno));
+        fprintf(stderr, "Failed to parse Pre-Shared-Key HEXSTRING\r\n");
         return -1;
     }
 
-    /*
-     * Now the main function fill an array with each object, this list will be later passed to liblwm2m.
-     * Those functions are located in their respective object file.
-     */
-#ifdef WITH_TINYDTLS
-    if (psk != NULL)
-    {
-        pskLen = strlen(psk) / 2;
-        pskBuffer = malloc(pskLen);
-
-        if (NULL == pskBuffer)
-        {
-            fprintf(stderr, "Failed to create PSK binary buffer\r\n");
-            return -1;
-        }
-        // Hex string to binary
-        char *h = psk;
-        char *b = pskBuffer;
-        char xlate[] = "0123456789ABCDEF";
-
-        for ( ; *h; h += 2, ++b)
-        {
-            char *l = strchr(xlate, toupper(*h));
-            char *r = strchr(xlate, toupper(*(h+1)));
-
-            if (!r || !l)
-            {
-                fprintf(stderr, "Failed to parse Pre-Shared-Key HEXSTRING\r\n");
-                return -1;
-            }
-
-            *b = ((l - xlate) << 4) + (r - xlate);
-        }
+    *b = ((l - xlate) << 4) + (r - xlate);
     }
+
+
+
+
+
+
+#else
+    g_LwM2M.p_pskId = 0;
+    #ifdef WITH_TINYDTLS
+    g_LwM2M.psk = "";
+    #endif
+    g_LwM2M.pskLen = 0;
 #endif
+  //  char * pskBuffer = NULL;
+
+    memset(&data, 0, sizeof(client_data_t));
+    data.addressFamily = AF_INET;  //AF_INET6;
 
     char serverUri[50];
     int serverId = 123;
 #ifdef WITH_TINYDTLS
-    sprintf (serverUri, "coaps://%s:%s", server, serverPort);
+    sprintf (serverUri, "coaps://%s:%s", g_LwM2M.server, g_LwM2M.serverPort);
 #else
-    sprintf (serverUri, "coap://%s:%s", server, serverPort);
+    sprintf (serverUri, "coap://%s:%s", g_LwM2M.server, serverPort);
 #endif
 #ifdef LWM2M_BOOTSTRAP
     objArray[0] = get_security_object(serverId, serverUri, pskId, pskBuffer, pskLen, bootstrapRequested);
 #else
-    objArray[0] = get_security_object(serverId, serverUri, pskId, pskBuffer, pskLen, false);
+    objArray[0] = get_security_object(serverId, serverUri, g_LwM2M.p_pskId, g_LwM2M.psk, g_LwM2M.pskLen, false);
 #endif
     if (NULL == objArray[0])
     {
@@ -1261,36 +1151,45 @@ int main(int argc, char *argv[])
      * The liblwm2m library is now initialized with the functions that will be in
      * charge of communication
      */
-    lwm2mH = lwm2m_init(&data);
-    if (NULL == lwm2mH)
+    g_LwM2M.lwm2mH = lwm2m_init(&data);
+    if (NULL == g_LwM2M.lwm2mH)
     {
         fprintf(stderr, "lwm2m_init() failed\r\n");
         return -1;
     }
 #ifdef WITH_TINYDTLS
-    data.lwm2mH = lwm2mH;
+    data.lwm2mH = g_LwM2M.lwm2mH;
 #endif
 
     /*
      * We configure the liblwm2m library with the name of the client - which shall be unique for each client -
      * the number of objects we will be passing through and the objects array
      */
-    result = lwm2m_configure(lwm2mH, name, NULL, NULL, OBJ_COUNT, objArray);
+    result = lwm2m_configure(g_LwM2M.lwm2mH, g_LwM2M.name, NULL, NULL, OBJ_COUNT, objArray);
     if (result != 0)
     {
         fprintf(stderr, "lwm2m_configure() failed: 0x%X\r\n", result);
         return -1;
     }
 
-    signal(SIGINT, handle_sigint);
+    // signal(SIGINT, handle_sigint);
 
     /**
      * Initialize value changed callback.
      */
-    init_value_change(lwm2mH);
+    init_value_change(g_LwM2M.lwm2mH);
 
-    fprintf(stdout, "LWM2M Client \"%s\" started on port %s\r\n", name, localPort);
-    fprintf(stdout, "> "); fflush(stdout);
+
+    //data.lwm2mH = lwm2mH;
+
+    // TODO !!!MZA???
+    //xxxx(lwm2mH);
+    nowPoll = true;
+
+    //Sleep(60000);
+    return 0;
+
+#ifdef NO_FAKE_UDS
     /*
      * We now enter in a while loop that will handle the communications from the server
      */
@@ -1324,7 +1223,7 @@ int main(int argc, char *argv[])
         }
         else if (batterylevelchanging)
         {
-            update_battery_level(lwm2mH);
+            update_battery_level(g_LwM2M.lwm2mH);
             tv.tv_sec = 5;
         }
         else
@@ -1332,61 +1231,15 @@ int main(int argc, char *argv[])
             tv.tv_sec = 60;
         }
         tv.tv_usec = 0;
-
+/*
         FD_ZERO(&readfds);
         FD_SET(data.sock, &readfds);
         FD_SET(STDIN_FILENO, &readfds);
+*/
+        xxxx(g_LwM2M.lwm2mH);
 
-        /*
-         * This function does two things:
-         *  - first it does the work needed by liblwm2m (eg. (re)sending some packets).
-         *  - Secondly it adjusts the timeout value (default 60s) depending on the state of the transaction
-         *    (eg. retransmission) and the time between the next operation
-         */
-        result = lwm2m_step(lwm2mH, &(tv.tv_sec));
-        fprintf(stdout, " -> State: ");
-        switch (lwm2mH->state)
-        {
-        case STATE_INITIAL:
-            fprintf(stdout, "STATE_INITIAL\r\n");
-            break;
-        case STATE_BOOTSTRAP_REQUIRED:
-            fprintf(stdout, "STATE_BOOTSTRAP_REQUIRED\r\n");
-            break;
-        case STATE_BOOTSTRAPPING:
-            fprintf(stdout, "STATE_BOOTSTRAPPING\r\n");
-            break;
-        case STATE_REGISTER_REQUIRED:
-            fprintf(stdout, "STATE_REGISTER_REQUIRED\r\n");
-            break;
-        case STATE_REGISTERING:
-            fprintf(stdout, "STATE_REGISTERING\r\n");
-            break;
-        case STATE_READY:
-            fprintf(stdout, "STATE_READY\r\n");
-            break;
-        default:
-            fprintf(stdout, "Unknown...\r\n");
-            break;
-        }
-        if (result != 0)
-        {
-            fprintf(stderr, "lwm2m_step() failed: 0x%X\r\n", result);
-#ifdef LWM2M_BOOTSTRAP
-            if(previousState == STATE_BOOTSTRAPPING)
-            {
-#ifdef LWM2M_WITH_LOGS
-                fprintf(stdout, "[BOOTSTRAP] restore security and server objects\r\n");
-#endif
-                prv_restore_objects(lwm2mH);
-                lwm2mH->state = STATE_INITIAL;
-            } else
-#endif
-                return -1;
-        }
-#ifdef LWM2M_BOOTSTRAP
-        update_bootstrap_info(&previousState, lwm2mH);
-#endif
+
+
         /*
          * This part will set up an interruption until an event happen on SDTIN or the socket until "tv" timed out (set
          * with the precedent function)
@@ -1520,13 +1373,13 @@ int main(int argc, char *argv[])
     if (g_quit == 1)
     {
 #ifdef WITH_TINYDTLS
-        free(pskBuffer);
+      //  free(pskBuffer);
 #endif
 
 #ifdef LWM2M_BOOTSTRAP
         close_backup_object();
 #endif
-        lwm2m_close(lwm2mH);
+        lwm2m_close(g_LwM2M.lwm2mH);
     }
     close(data.sock);
     connection_free(data.connList);
@@ -1544,4 +1397,44 @@ int main(int argc, char *argv[])
     acl_ctrl_free_object(objArray[8]);
 
     return 0;
+#endif
+
 }
+
+
+void xxx_onUdsReceive(uint8_t *b, int len)
+{
+    dtls_connection_t * newConnP = data.connList;
+
+    int result = connection_handle_packet(newConnP, b, len);
+    if (0 != result)
+    {
+        printf("error handling message %d\n",result);
+    }
+   // xxxx(data.lwm2mH);
+}
+
+void lwm2m_oneSec(void) {
+    static int sec = 0;
+    if (nowPoll) {
+        sec++;
+        if (sec > 15)
+        {
+            sec=0;
+        }
+        if (sec == 1) {
+          xxxx(data.lwm2mH);
+        }
+    } else {
+       sec=0;
+    }
+
+}
+
+void lwm2m_PollNow(void) {
+
+    g_LwM2M.myTv =  60;        // we received ... now 60 sec more
+    xxxx(data.lwm2mH);
+
+}
+

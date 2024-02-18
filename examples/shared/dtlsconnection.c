@@ -135,7 +135,7 @@ int send_data(dtls_connection_t *connP,
     int nbSent;
     size_t offset;
 
-#ifdef LWM2M_WITH_LOGS
+#ifdef LWM2M_WITH_LOGSX
     char s[INET6_ADDRSTRLEN];
     in_port_t port;
 
@@ -162,7 +162,7 @@ int send_data(dtls_connection_t *connP,
     offset = 0;
     while (offset != length)
     {
-        nbSent = sendto(connP->sock, buffer + offset, length - offset, 0, (struct sockaddr *)&(connP->addr), connP->addrLen);
+        nbSent = Xsendto(connP->sock, buffer + offset, length - offset, 0, (struct sockaddr *)&(connP->addr), connP->addrLen);
         if (nbSent == -1) return -1;
         offset += nbSent;
     }
@@ -355,6 +355,7 @@ int sockaddr_cmp(struct sockaddr *x, struct sockaddr *y)
 
 int create_socket(const char * portStr, int ai_family)
 {
+#ifdef NO_FAKE_UDS
     int s = -1;
     struct addrinfo hints;
     struct addrinfo *res;
@@ -386,6 +387,8 @@ int create_socket(const char * portStr, int ai_family)
     freeaddrinfo(res);
 
     return s;
+#endif
+    return 1;
 }
 
 dtls_connection_t * connection_find(dtls_connection_t * connList,
@@ -397,11 +400,13 @@ dtls_connection_t * connection_find(dtls_connection_t * connList,
     connP = connList;
     while (connP != NULL)
     {
-
-       if (sockaddr_cmp((struct sockaddr*) (&connP->addr),(struct sockaddr*) addr)) {
+#ifdef NO_FAKE_UDS
+        if (sockaddr_cmp((struct sockaddr*) (&connP->addr),(struct sockaddr*) addr)) {
             return connP;
-       }
-
+        }
+#else
+       return connP;  // we have only one.
+#endif
        connP = connP->next;
     }
 
@@ -500,7 +505,7 @@ dtls_connection_t * connection_create(dtls_connection_t * connList,
         *port = 0;
         port++;
     }
-
+#ifdef NO_FAKE_UDS
     if (0 != getaddrinfo(host, port, &hints, &servinfo) || servinfo == NULL) return NULL;
 
     // we test the various addresses
@@ -519,6 +524,15 @@ dtls_connection_t * connection_create(dtls_connection_t * connList,
             }
         }
     }
+#else
+s=1; // fale
+static    struct sockaddr xsa;
+sa = &xsa;
+sl = sizeof(sa);
+xsa.sa_data[0] = 42;
+xsa.sa_data[1] = 0;
+xsa.sa_family = AF_INET; // just a fake -> must be one or other AF_INET6
+#endif
     if (s >= 0)
     {
         connP = connection_new_incoming(connList, sock, sa, sl);
@@ -646,7 +660,7 @@ uint8_t lwm2m_buffer_send(void * sessionH,
 
     if (-1 == connection_send(connP, buffer, length))
     {
-        fprintf(stderr, "#> failed sending %zu bytes\r\n", length);
+        fprintf(stderr, "#> Failed sending %zu bytes\r\n", length);
         return COAP_500_INTERNAL_SERVER_ERROR ;
     }
 

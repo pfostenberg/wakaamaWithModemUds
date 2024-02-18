@@ -251,10 +251,11 @@ static lwm2m_transaction_t * prv_create_next_block_transaction(lwm2m_transaction
 
     if (message->proxy_uri != NULL)
     {
-        char  str[message->proxy_uri_len + 1];
+        char *str = lwm2m_malloc(message->proxy_uri_len + 1);
         str[message->proxy_uri_len] = '\0';
         memcpy(str, message->proxy_uri, message->proxy_uri_len);
         coap_set_header_proxy_uri(clone->message, str);
+        lwm2m_free(str);
     }
 
     if (IS_OPTION(message, COAP_OPTION_ETAG))
@@ -264,10 +265,11 @@ static lwm2m_transaction_t * prv_create_next_block_transaction(lwm2m_transaction
 
     if (message->uri_host != NULL)
     {
-        char  str[message->uri_host_len + 1];
+        char *str = lwm2m_malloc(message->uri_host_len + 1);
         str[message->uri_host_len] = '\0';
         memcpy(str, message->uri_host, message->uri_host_len);
         coap_set_header_uri_host(clone->message, str);
+        lwm2m_free(str);
     }
 
     if (IS_OPTION(message, COAP_OPTION_URI_PORT))
@@ -283,10 +285,11 @@ static lwm2m_transaction_t * prv_create_next_block_transaction(lwm2m_transaction
     
     if (message->location_query != NULL)
     {
-        char  str[message->location_query_len + 1];
+        char *str = lwm2m_malloc(message->location_query_len + 1);
         str[message->location_query_len] = '\0';
         memcpy(str, message->location_query, message->location_query_len);
         coap_set_header_location_query(clone->message, str);
+        lwm2m_free(str);
     }
 
     if(IS_OPTION(message, COAP_OPTION_CONTENT_TYPE))
