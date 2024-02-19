@@ -15,6 +15,7 @@ CONFIG += console
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 #DEFINES += LWM2M_BOOTSTRAP
+
 DEFINES += LWM2M_CLIENT_MODE
 DEFINES += LWM2M_COAP_DEFAULT_BLOCK_SIZE=1024
 DEFINES += LWM2M_LITTLE_ENDIAN
@@ -23,13 +24,24 @@ DEFINES += SHA2_USE_INTTYPES_H
 DEFINES += WITH_SHA256
 DEFINES += WITH_TINYDTLS
 
+# needed to read data from leshan
+DEFINES += LWM2M_SUPPORT_JSON
+
+# tests..
 #DEFINES += LWM2M_SUPPORT_TLV
 
+#DEFINES += LWM2M_FIRMWARE_UPGRADES
+#DEFINES += LWM2M_DEVICE_INFO_WITH_TIME
+
+# Qt Windows needed
 DEFINES += CRT_SECURE_NO_WARNINGS
-# no debugging
-#DEFINES += NDEBUG
+
+# no debugging next 2 off
 DEFINES += LWM2M_WITH_LOGS
 DEFINES += HAVE_VPRINTF
+
+
+#DEFINES += NDEBUG
 #DEFINES += DTLS_ECC
 #DEFINES += DTLS_PSK
 
@@ -66,6 +78,7 @@ SOURCES += \
     ..\data\data.c \
     ..\data\tlv.c \
     ..\data\senml_json.c \
+    ..\data\json.c \
     ..\data\json_common.c \
     ..\examples\client\object_device.c \
     ..\examples\client\object_firmware.c \

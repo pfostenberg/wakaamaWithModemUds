@@ -41,6 +41,9 @@ typedef struct MY_TYPE_ {
     lwm2m_context_t *lwm2mH;
     //struct timeval tv;
     uint32_t myTv;
+    #ifdef LWM2M_BOOTSTRAP
+    lwm2m_client_state_t previousState;
+#endif
 } MY_TYPE;
 
 int myClientInit(void);

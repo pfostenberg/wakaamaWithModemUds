@@ -954,7 +954,7 @@ if (result != 0)
 {
     fprintf(stderr, "lwm2m_step() failed: 0x%X\r\n", result);
 #ifdef LWM2M_BOOTSTRAP
-    if(previousState == STATE_BOOTSTRAPPING)
+    if(g_LwM2M.previousState == STATE_BOOTSTRAPPING)
     {
 #ifdef LWM2M_WITH_LOGS
         fprintf(stdout, "[BOOTSTRAP] restore security and server objects\r\n");
@@ -966,7 +966,7 @@ if (result != 0)
         return -1;
 }
 #ifdef LWM2M_BOOTSTRAP
-update_bootstrap_info(&previousState, lwm2mH);
+update_bootstrap_info(&g_LwM2M.previousState, lwm2mH);
 #endif
 }
 
@@ -1005,7 +1005,7 @@ int main_wakaama(int argc, char *argv[])
     bool serverPortChanged = false;
 
 #ifdef LWM2M_BOOTSTRAP
-    lwm2m_client_state_t previousState = STATE_INITIAL;
+    g_LwM2M.previousState = STATE_INITIAL;
 #endif
 
 #ifdef MU_DTLS
@@ -1015,6 +1015,7 @@ int main_wakaama(int argc, char *argv[])
 
   //  g_LwM2M.psk
     g_LwM2M.psk = malloc(g_LwM2M.pskLen);
+    bootstrapRequested = true;
 
     if (NULL == g_LwM2M.psk)
     {
@@ -1065,7 +1066,7 @@ int main_wakaama(int argc, char *argv[])
     sprintf (serverUri, "coap://%s:%s", g_LwM2M.server, serverPort);
 #endif
 #ifdef LWM2M_BOOTSTRAP
-    objArray[0] = get_security_object(serverId, serverUri, pskId, pskBuffer, pskLen, bootstrapRequested);
+    objArray[0] = get_security_object(serverId, serverUri, g_LwM2M.p_pskId, g_LwM2M.psk, g_LwM2M.pskLen, bootstrapRequested);
 #else
     objArray[0] = get_security_object(serverId, serverUri, g_LwM2M.p_pskId, g_LwM2M.psk, g_LwM2M.pskLen, false);
 #endif
