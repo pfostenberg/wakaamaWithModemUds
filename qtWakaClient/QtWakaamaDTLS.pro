@@ -1,7 +1,3 @@
-
-# client c call
-#  ./lwm2mclient -4 -h lwm2m.mudip.com -p 5683 -n urn:imei:86448606188409
-
 QT       += core gui
 QT += network
 
@@ -43,9 +39,6 @@ DEFINES += CRT_SECURE_NO_WARNINGS
 DEFINES += LWM2M_WITH_LOGS
 DEFINES += HAVE_VPRINTF
 
-# we do not use POSIX !
-DEFINES += NO_SYSTEM_SOCKETS
-
 
 #DEFINES += NDEBUG
 #DEFINES += DTLS_ECC
@@ -56,8 +49,8 @@ DEFINES += NO_SYSTEM_SOCKETS
 #DEFINES += DTLS_PEERS_NOHASH
 
 # uncomment for DTLS
-#DEFINES += MU_DTLS
-#DEFINES += WITH_TINYDTLS
+DEFINES += MU_DTLS
+DEFINES += WITH_TINYDTLS
 
 
 #// Client mode, posix, with json and dtls
@@ -102,26 +95,34 @@ SOURCES += \
     ..\coap\transaction.c \
     ..\coap\block.c \
     ..\coap\er-coap-13\er-coap-13.c \
-    ..\examples\shared\viconnection.c \
+    ..\examples\shared\dtlsconnection.c \
     qtipv4ud.cpp \
-    qtsimpleudp.cpp \    
+    qtsimpleudp.cpp \
+    tinydtls\ccm.c \
+    tinydtls\crypto.c \
+    tinydtls\dtls.c \
+    tinydtls\dtls_prng.c \
+    tinydtls\dtls_time.c \
+    tinydtls\dtls_debug.c \
+    tinydtls\hmac.c \
+    tinydtls\netq.c \
+    tinydtls\peer.c \
+    tinydtls\session.c \
+    tinydtls\aes\rijndael_wrap.c \
+    tinydtls\sha2\sha2.c \
+    tinydtls\ecc\ecc.c \
+    tinydtls\aes\rijndael.c \
     modem_sim_udp.c \
     fake_time.c
 
-# unix like
-#..\examples\shared\connection.c \
-#    ..\examples\shared\dtlsconnection.c \
 
 HEADERS += \
     mainwindow.h \
     win_fake_include\unistd.h \
-    win_fake_include\sys\socket.h \
-    win_fake_include\sys\select.h \
-    win_fake_include\sys\stat.h \
     dtls_config.h \
     qtipv4ud.h \
-    qtsimpleudp.h
-#    include\liblwm2m.h
+    qtsimpleudp.h \
+    include\liblwm2m.h
 
 # C:\work\git\wakaamaWithModemUds\include
 # C:\Users\mza\Downloads\wakaama-master\include

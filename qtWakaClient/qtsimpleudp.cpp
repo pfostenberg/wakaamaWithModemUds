@@ -22,9 +22,10 @@ void QtSimpleUdp::sendUDPhex(const char *hexString)
     sendUDP(cmd.constData(), cmd.size());
 }
 
-void QtSimpleUdp::sendUDP(const char *data, size_t len)
+long QtSimpleUdp::sendUDP(const char *data, size_t len)
 {
     qDebug() << "sendUDP2 base: " << len;
+    return len;  // all send
 }
 
 void QtSimpleUdp::rxUdpDataEvent()

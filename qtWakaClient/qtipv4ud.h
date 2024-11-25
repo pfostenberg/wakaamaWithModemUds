@@ -11,7 +11,7 @@ public:
     explicit QtIpV4Ud( QObject *parent = nullptr);
     virtual int doConnect(QString url, int port);
     virtual void doDisconnect();
-    void sendUDP(const char *data, size_t len);
+    long sendUDP(const char *data, size_t len);
 
 public slots:
     void rxUdpDataEvent();

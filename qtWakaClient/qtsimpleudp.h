@@ -13,7 +13,7 @@ public:
     virtual int doConnect(QString url, int port);
     // 2 ways of sending
     virtual void sendUDPhex(const char *hexString);
-    virtual void sendUDP(const char *data, size_t len);
+    virtual long sendUDP(const char *data, size_t len);
 signals:
     // all received data.
     void onReceive(const QByteArray ba);

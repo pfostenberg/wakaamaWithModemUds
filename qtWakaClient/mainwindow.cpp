@@ -84,18 +84,17 @@ void MainWindow::pb3()
 
 extern "C" void lwm2m_PollNow(void);
 
+extern "C" void lwm2m_oneSec(void);
+
+
 extern "C" int Xsendto(int sockfd, const void *buf, size_t len, int flags ) {
-    printf("XXXXX2\r\n");
-
-
+//    printf("Xsendto ???? !!!! XXXXX2\r\n");
 
     g_qudp->sendUDP((const char *)buf,len);
  //   xxxx(data.lwm2mH); // check timeout
 
     return len;
 }
-
-extern "C" void lwm2m_oneSec(void);
 
 void MainWindow::time1sec()
 {

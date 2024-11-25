@@ -102,9 +102,10 @@ typedef struct
     lwm2m_object_t * securityObjP;
     lwm2m_object_t * serverObject;
     int sock;
+    lwm2m_context_t * lwm2mH;
 #ifdef WITH_TINYDTLS
     dtls_connection_t * connList;
-    lwm2m_context_t * lwm2mH;
+
 #else
     connection_t * connList;
 #endif
@@ -918,6 +919,7 @@ int xxxx(lwm2m_context_t * lwm2mH)
 {
 
 
+
 /*
          * This function does two things:
          *  - first it does the work needed by liblwm2m (eg. (re)sending some packets).
@@ -977,15 +979,21 @@ int myClientInit(void)
 {
 // tcpdump -n udp port 7685
     g_LwM2M.lwm2mH = NULL;
-    g_LwM2M.server = "lwm2m.mudip.com";
-    g_LwM2M.serverPort = "7685"; // LWM2M_DTLS_PORT_STR;  //LWM2M_STANDARD_PORT_STR;  // 5684
 
+   //coaps://lwm2m.mudip.com:7685 urn:imei:866901063238648 with 000102030405060708090a0b0c0d0e49
+
+
+    g_LwM2M.server = "lwm2m.mudip.com";
+ #ifdef MU_DTLS
+    g_LwM2M.serverPort = "7685"; // LW DTLS port
+#else
+    g_LwM2M.serverPort = "5683"; // LW NO DTLS
+#endif
     g_LwM2M.myTv =  60;  // What initial
-    // const char *name = "XyXX001";  // "TEST001"; secure
     #ifdef MU_DTLS
     g_LwM2M.name = "urn:imei:866901063238648";  // "TEST001";   see NO_FAKE_UDS
     #else
-    g_LwM2M.name = "EID02";
+    g_LwM2M.name = "urn:imei:866901063238649";
     #endif
 
 // test mit command line
@@ -1011,6 +1019,9 @@ int main_wakaama(int argc, char *argv[])
 #ifdef MU_DTLS
     g_LwM2M.p_pskId = "urn:imei:866901063238648";
     char *psk = "000102030405060708090a0b0c0d0e49";  // NO_FAKE_UDS
+
+
+
     g_LwM2M.pskLen = strlen(psk)/2;   // Must be hex len / by two!
 
   //  g_LwM2M.psk
@@ -1063,7 +1074,7 @@ int main_wakaama(int argc, char *argv[])
 #ifdef WITH_TINYDTLS
     sprintf (serverUri, "coaps://%s:%s", g_LwM2M.server, g_LwM2M.serverPort);
 #else
-    sprintf (serverUri, "coap://%s:%s", g_LwM2M.server, serverPort);
+    sprintf (serverUri, "coap://%s:%s", g_LwM2M.server, g_LwM2M.serverPort);
 #endif
 #ifdef LWM2M_BOOTSTRAP
     objArray[0] = get_security_object(serverId, serverUri, g_LwM2M.p_pskId, g_LwM2M.psk, g_LwM2M.pskLen, bootstrapRequested);
@@ -1158,9 +1169,9 @@ int main_wakaama(int argc, char *argv[])
         fprintf(stderr, "lwm2m_init() failed\r\n");
         return -1;
     }
-#ifdef WITH_TINYDTLS
+//#ifdef WITH_TINYDTLS
     data.lwm2mH = g_LwM2M.lwm2mH;
-#endif
+//#endif
 
     /*
      * We configure the liblwm2m library with the name of the client - which shall be unique for each client -
@@ -1402,9 +1413,16 @@ int main_wakaama(int argc, char *argv[])
 
 }
 
+#ifdef MU_DTLS
+
+#else
+extern connection_t * gXconnP;
+#endif
+
 
 void xxx_onUdsReceive(uint8_t *b, int len)
 {
+#ifdef MU_DTLS
     dtls_connection_t * newConnP = data.connList;
 
     int result = connection_handle_packet(newConnP, b, len);
@@ -1412,6 +1430,12 @@ void xxx_onUdsReceive(uint8_t *b, int len)
     {
         printf("error handling message %d\n",result);
     }
+
+#else
+
+    lwm2m_handle_packet(data.lwm2mH, b, len, (void*)data.lwm2mH);
+    xxxx(data.lwm2mH);
+#endif
    // xxxx(data.lwm2mH);
 }
 

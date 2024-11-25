@@ -2,11 +2,26 @@
 #define _UNISTD_H    1
 
 #include <io.h>
-//#include <windows.h>
-//#include <Ws2ipdef.h>
-//#include <winsock.h>
+#ifndef MU_DTLS
 
 /*
+struct sockaddr_in6 {
+    int sin6_addr;
+    int sin6_port;
+    int sin6_family;
+};
+
+#define AF_INET 4
+*/
+
+#endif
+
+/*
+ *
+#include <windows.h>
+#include <Ws2ipdef.h>
+#include <winsock.h>
+
 struct sockaddr_in6 {
     int sin6_addr;
     int sin6_port;

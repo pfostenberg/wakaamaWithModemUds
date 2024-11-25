@@ -60,7 +60,7 @@ void QtIpV4Ud::rxUdpDataEvent()
     }
 }
 
-void QtIpV4Ud::sendUDP(const char *data, size_t len)
+long QtIpV4Ud::sendUDP(const char *data, size_t len)
 {
     QByteArray cmd(data,len);
 
@@ -95,4 +95,5 @@ A8 01 00 00  04 00 17 00  00                         .........
     }
     //    qDebug() << "qt5 sendUDP1: " << cmd.toHex()   << " send ret: " << ret << " url " << dst << " port: " << m_Port;
 //
+    return ret;
 }
